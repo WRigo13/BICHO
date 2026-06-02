@@ -673,22 +673,26 @@ window.addEventListener('beforeinstallprompt',e=>{
   mostrarBannerAndroid(true); // mostra banner com botão Instalar
 });
 
+function fecharBanner(){
+  hide("install-banner");
+  localStorage.setItem('install-dismissed','1');
+}
+
 $("btn-install-ok")?.addEventListener('click',async()=>{
   if(deferredPrompt){
+    fecharBanner();
     deferredPrompt.prompt();
     const{outcome}=await deferredPrompt.userChoice;
     if(outcome==='accepted')toast('✅ App instalado com sucesso!');
+    else toast('Instalação cancelada');
     deferredPrompt=null;
-    hide("install-banner");
   } else {
-    toast('Use o menu do navegador para instalar');
+    fecharBanner();
+    toast('Use o menu ⋮ → "Adicionar à tela inicial"');
   }
 });
 
-$("btn-install-fechar")?.addEventListener('click',()=>{
-  hide("install-banner");
-  localStorage.setItem('install-dismissed','1');
-});
+$("btn-install-fechar")?.addEventListener('click',()=>fecharBanner());
 
 window.addEventListener('appinstalled',()=>{
   hide("install-banner");
@@ -704,8 +708,8 @@ setTimeout(()=>{
   else if(isAndroid()&&!deferredPrompt)mostrarBannerAndroid(false);
 },2000);
 
-// Service Worker
-if('serviceWorker' in navigator){
+// Service Worker — só ativa fora do preview do Claude
+if('serviceWorker' in navigator && !location.hostname.includes('claudeusercontent.com')){
   window.addEventListener('load',()=>{
     navigator.serviceWorker.register('sw.js')
       .then(()=>console.log('SW registrado'))
