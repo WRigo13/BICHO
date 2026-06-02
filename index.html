@@ -267,6 +267,45 @@
     .badge { background: #2563eb; color: #fff; border-radius: 20px; padding: 2px 10px; font-size: 12px; margin-left: 6px; }
 
     @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    /* ── BOTÃO DE INSTALAÇÃO PWA ── */
+    #installContainer {
+      position: fixed;
+      bottom: 80px;
+      left: 0;
+      right: 0;
+      display: flex;
+      justify-content: center;
+      z-index: 1000;
+      animation: slideUp 0.3s ease;
+    }
+    #installBtn {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
+      color: white;
+      border: none;
+      border-radius: 40px;
+      padding: 14px 28px;
+      font-size: 16px;
+      font-weight: bold;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    @keyframes slideUp {
+      from {
+        transform: translateY(100%);
+        opacity: 0;
+      }
+      to {
+        transform: translateY(0);
+        opacity: 1;
+      }
+    }
+    @media all and (display-mode: standalone) {
+      #installContainer {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 <body>
@@ -417,6 +456,11 @@
     </button>
   </div>
 
+  <!-- BOTÃO DE INSTALAÇÃO PWA -->
+  <div id="installContainer" style="display: none;">
+    <button id="installBtn">📲 Instalar Jogo do Bicho</button>
+  </div>
+
 </div><!-- fim app -->
 
 <script>
@@ -513,416 +557,4 @@ function podeApostar() {
 function atualizarSaldo() {
   $("saldo-txt").textContent = "R$ " + saldo.toFixed(2).replace('.', ',');
   if (saldo < 10) $("saldo-txt").classList.add('saldo-baixo');
-  else $("saldo-txt").classList.remove('saldo-baixo');
-}
-
-// ─── MODALIDADE ───────────────────────────────────────────
-function renderModInfo() {
-  const mod = getMod();
-  $("mod-nome").textContent = mod.nome;
-  $("mod-desc").innerHTML   = mod.desc + ' · <b style="color:#2563eb">×' + mod.mult + '</b>';
-  $("mod-arrow").textContent = modOpen ? "▲" : "▼";
-}
-
-function renderModOpcoes() {
-  const el = $("mod-opcoes");
-  el.innerHTML = "";
-  MODS.forEach((m, i) => {
-    if (i === modIdx) return;
-    const btn = document.createElement("button");
-    btn.className = "mod-opt";
-    btn.innerHTML = `
-      <div>
-        <div class="mod-opt-nome">${m.nome}</div>
-        <div class="mod-opt-desc">${m.desc}</div>
-      </div>
-      <span class="mult-badge">×${m.mult}</span>`;
-    btn.onclick = () => { modIdx = i; modOpen = false; animal = null; numInput = ""; aplicarMod(); };
-    el.appendChild(btn);
-  });
-}
-
-function toggleMod() {
-  modOpen = !modOpen;
-  renderModInfo();
-  renderModOpcoes();
-  toggle("mod-opcoes", modOpen);
-}
-
-function aplicarMod() {
-  const mod = getMod();
-  renderModInfo();
-  hide("mod-opcoes");
-  modOpen = false;
-
-  // grade animais
-  const usaAnimal = mod.id==="bicho"||mod.id==="grupo";
-  toggle("card-animais", usaAnimal);
-  toggle("card-numero", !usaAnimal);
-
-  if (!usaAnimal) {
-    const maxLen = mod.id==="dezena"?2:mod.id==="centena"?3:4;
-    const labels = {dezena:"DEZENA (00–99)", centena:"CENTENA (000–999)", milhar:"MILHAR (0000–9999)"};
-    const placeholders = {dezena:"Ex: 42", centena:"Ex: 142", milhar:"Ex: 4231"};
-    $("num-label").textContent   = labels[mod.id];
-    $("num-input").placeholder   = placeholders[mod.id];
-    $("num-input").maxLength     = maxLen;
-    $("num-input").value         = "";
-    numInput = "";
-    hide("animal-preview");
-  }
-
-  renderGrade();
-  atualizarPremio();
-  atualizarBotao();
-}
-
-// ─── GRADE ANIMAIS ────────────────────────────────────────
-function renderGrade() {
-  const filtro = ($("filtro-input").value||"").toLowerCase();
-  const el     = $("grade-animais");
-  el.innerHTML = "";
-
-  ANIMAIS.filter(a => a.nome.toLowerCase().includes(filtro)).forEach(a => {
-    const btn = document.createElement("button");
-    btn.className = "animal-card" + (animal?.id===a.id ? " selecionado" : "");
-    btn.innerHTML = `
-      ${animal?.id===a.id ? '<div class="check-badge">✓</div>' : ''}
-      <span class="animal-card-emoji">${a.e}</span>
-      <div class="animal-card-nome">${a.nome}</div>
-      <div class="animal-card-dez">${a.dez[0]}–${a.dez[3]}</div>`;
-    btn.onclick = () => selecionarAnimal(a);
-    el.appendChild(btn);
-  });
-}
-
-function selecionarAnimal(a) {
-  animal = a;
-  $("animal-sel-emoji").textContent = a.e;
-  $("animal-sel-nome").textContent  = a.nome;
-  $("animal-sel-dez").textContent   = "Dezenas: " + a.dez.join(", ");
-  show("animal-selecionado");
-  renderGrade();
-  atualizarPremio();
-  atualizarBotao();
-}
-
-function limparAnimal() {
-  animal = null;
-  hide("animal-selecionado");
-  renderGrade();
-  atualizarPremio();
-  atualizarBotao();
-}
-
-// ─── NÚMERO ───────────────────────────────────────────────
-function onNumInput() {
-  const mod    = getMod();
-  const maxLen = mod.id==="dezena"?2:mod.id==="centena"?3:4;
-  numInput     = $("num-input").value.replace(/\D/g,"").slice(0, maxLen);
-  $("num-input").value = numInput;
-
-  // animal preview
-  let aPreview = null;
-  if (mod.id==="dezena"  && numInput.length===2) aPreview = byDez(numInput.padStart(2,"0"));
-  if (mod.id==="centena" && numInput.length===3) aPreview = byDez(numInput.slice(-2));
-  if (mod.id==="milhar"  && numInput.length===4) aPreview = byDez(numInput.slice(-2));
-
-  if (aPreview) {
-    $("preview-emoji").textContent = aPreview.e;
-    $("preview-nome").textContent  = aPreview.nome;
-    show("animal-preview");
-  } else {
-    hide("animal-preview");
-  }
-
-  atualizarPremio();
-  atualizarBotao();
-}
-
-// ─── VALOR ────────────────────────────────────────────────
-function renderVals() {
-  const el = $("vals-grid");
-  el.innerHTML = "";
-  VALS.forEach(vv => {
-    const btn = document.createElement("button");
-    btn.className = "val-btn" + (valor===vv ? " ativo" : "");
-    btn.textContent = "R$"+vv;
-    btn.onclick = () => { valor = vv; $("valor-input").value = vv; renderVals(); atualizarPremio(); atualizarBotao(); };
-    el.appendChild(btn);
-  });
-}
-
-$("valor-input").addEventListener("input", function() {
-  valor = this.value;
-  // desmarcar botões rápidos
-  document.querySelectorAll(".val-btn").forEach(b => b.classList.remove("ativo"));
-  atualizarPremio();
-  atualizarBotao();
-});
-
-function atualizarPremio() {
-  const v   = getValor();
-  const mod = getMod();
-  const ok  = podeApostar();
-
-  if (ok) {
-    $("premio-txt").textContent = "R$ " + (v * mod.mult).toFixed(2);
-    show("premio-box");
-  } else {
-    hide("premio-box");
-  }
-
-  toggle("erro-saldo", v > saldo && v > 0);
-}
-
-function atualizarBotao() {
-  const btn = $("btn-apostar");
-  if (podeApostar()) {
-    btn.disabled = false;
-    btn.textContent = "🎲 FAZER APOSTA";
-  } else {
-    btn.disabled = true;
-    btn.textContent = "Preencha os campos acima";
-  }
-}
-
-// ─── SORTEIO ──────────────────────────────────────────────
-function lancar() {
-  if (!podeApostar()) return;
-  const v   = getValor();
-  const mod = getMod();
-  saldo = +(saldo - v).toFixed(2);
-  atualizarSaldo();
-
-  // esconder nav durante sorteio
-  hide("nav");
-  mostrarTela("sorteando");
-
-  // montar bolas vazias
-  const cont = $("bolas-container");
-  cont.innerHTML = "";
-  for (let i=0; i<5; i++) {
-    const b = document.createElement("div");
-    b.className = "bola";
-    b.id = "bola-"+i;
-    b.innerHTML = '<span class="bola-q">?</span>';
-    cont.appendChild(b);
-  }
-
-  const nums = sortear();
-  const aposta = {
-    mod: mod.id,
-    animalId: animal?.id,
-    num: numInput.padStart(mod.id==="dezena"?2:mod.id==="centena"?3:4,"0"),
-    valor: v, mult: mod.mult,
-    modNome: mod.nome, animalObj: animal,
-  };
-
-  let delay = 0;
-  nums.forEach((num, i) => {
-    delay += 700 + i*220;
-    setTimeout(() => revelarBola(i, num), delay-450);
-  });
-
-  setTimeout(() => {
-    const idx    = checar(aposta, nums);
-    const ganhou = idx >= 0;
-    const premio = ganhou ? +(v * mod.mult).toFixed(2) : 0;
-    if (ganhou) saldo = +(saldo + premio).toFixed(2);
-    atualizarSaldo();
-
-    const reg = { aposta, nums, ganhou, premio, premioIdx: idx };
-    historico.unshift(reg);
-    if (historico.length > 30) historico.pop();
-
-    mostrarResultado(reg);
-    show("nav");
-  }, delay+600);
-}
-
-function revelarBola(i, num) {
-  const a   = byDez(num.slice(-2));
-  const el  = $("bola-"+i);
-  el.classList.add("ativa");
-  el.innerHTML = `
-    <span class="bola-emoji">${a?.e||"?"}</span>
-    <span class="bola-num">${num}</span>
-    <span class="bola-premio">${i+1}º prêmio</span>`;
-}
-
-// ─── RESULTADO ────────────────────────────────────────────
-function mostrarResultado(reg) {
-  mostrarTela("resultado");
-
-  const rh = $("res-header");
-  rh.className = "res-header " + (reg.ganhou ? "ganhou" : "perdeu");
-  $("res-icon").textContent   = reg.ganhou ? "🏆" : "😔";
-  $("res-titulo").textContent = reg.ganhou ? "VOCÊ GANHOU!" : "Não foi dessa vez";
-  $("res-titulo").style.color = reg.ganhou ? "#166534" : "#991b1b";
-
-  if (reg.ganhou) {
-    $("res-premio").textContent = "R$ " + reg.premio.toFixed(2);
-    $("res-premio").style.color = "#166534";
-    show("res-premio");
-  } else { hide("res-premio"); }
-
-  $("res-saldo").textContent = "Saldo: R$ " + saldo.toFixed(2);
-  $("res-saldo").style.color = reg.ganhou ? "#166534" : "#991b1b";
-
-  // Bolas
-  const br = $("bolas-res");
-  br.innerHTML = "";
-  reg.nums.forEach((num, i) => {
-    const a    = byDez(num.slice(-2));
-    const dest = reg.ganhou && reg.premioIdx===i;
-    const div  = document.createElement("div");
-    div.className = "bola-res" + (dest ? " destaque" : "");
-    div.innerHTML = `
-      <div class="bola-premio">${i+1}º</div>
-      <div class="bola-emoji">${a?.e}</div>
-      <div class="bola-num-res" style="font-size:12px;font-weight:800;margin-top:2px">${num}</div>
-      <div class="bola-premio">${a?.nome}</div>`;
-    br.appendChild(div);
-  });
-
-  // Resumo
-  const rr = $("resumo-rows");
-  rr.innerHTML = "";
-  const linhas = [
-    ["Modalidade", reg.aposta.modNome],
-    reg.aposta.animalObj ? ["Animal", reg.aposta.animalObj.e+" "+reg.aposta.animalObj.nome] : null,
-    ["Apostado", "R$ "+reg.aposta.valor.toFixed(2)],
-    reg.ganhou ? ["Prêmio", "R$ "+reg.premio.toFixed(2)] : null,
-  ].filter(Boolean);
-  linhas.forEach(([k,v]) => {
-    rr.innerHTML += `<div class="resumo-row"><span class="resumo-key">${k}</span><span class="resumo-val">${v}</span></div>`;
-  });
-}
-
-function resetar() {
-  animal = null; numInput = "";
-  hide("animal-selecionado");
-  if ($("num-input")) $("num-input").value = "";
-  hide("animal-preview");
-  renderGrade();
-  atualizarPremio();
-  atualizarBotao();
-  mostrarTela("form");
-}
-
-// ─── BICHOS ───────────────────────────────────────────────
-function renderBichos() {
-  const gb = $("grade-bichos");
-  if (gb.children.length > 0) return; // já renderizado
-  ANIMAIS.forEach(a => {
-    const div = document.createElement("div");
-    div.className = "bicho-card";
-    div.innerHTML = `
-      <span class="bicho-emoji">${a.e}</span>
-      <div class="bicho-nome">${a.nome}</div>
-      <div class="bicho-grupo">G.${a.id}</div>
-      <div class="bicho-dezenas">${a.dez.map(d=>`<div class="dez-badge">${d}</div>`).join("")}</div>`;
-    gb.appendChild(div);
-  });
-
-  const lm = $("lista-mods");
-  MODS.forEach(m => {
-    lm.innerHTML += `
-      <div class="mod-card">
-        <div>
-          <div class="mod-card-nome">${m.nome}</div>
-          <div class="mod-card-desc">${m.desc}</div>
-        </div>
-        <div class="mult-box">
-          <span class="mult-paga">paga</span>
-          <span class="mult-val">×${m.mult}</span>
-        </div>
-      </div>`;
-  });
-}
-
-// ─── HISTÓRICO ────────────────────────────────────────────
-function renderHistorico() {
-  const el = $("lista-historico");
-  el.innerHTML = "";
-  const badge = $("hist-badge");
-
-  if (historico.length === 0) {
-    el.innerHTML = `<div class="card empty-hist">
-      <span class="empty-emoji">🎲</span>
-      <div class="empty-txt">Nenhuma aposta ainda</div>
-      <button onclick="irApostar()" style="background:#2563eb;color:#fff;border:none;border-radius:10px;padding:10px 22px;font-weight:700;font-size:14px">Apostar agora</button>
-    </div>`;
-    hide("hist-badge");
-    return;
-  }
-
-  badge.textContent = historico.length;
-  show("hist-badge");
-
-  historico.forEach(h => {
-    const numsHtml = h.nums.map(r => {
-      const a = byDez(r.slice(-2));
-      return `<span style="margin-right:5px">${a?.e}${r}</span>`;
-    }).join("");
-
-    el.innerHTML += `
-      <div class="hist-card ${h.ganhou?'ganhou':'perdeu'}">
-        <div class="hist-row">
-          <div class="hist-left">
-            <span style="font-size:20px">${h.ganhou?'🏆':'❌'}</span>
-            <div>
-              <div class="hist-mod">${h.aposta.modNome}${h.aposta.animalObj?' · '+h.aposta.animalObj.e+' '+h.aposta.animalObj.nome:''}</div>
-              <div class="hist-nums">${numsHtml}</div>
-            </div>
-          </div>
-          <div class="hist-right">
-            <div class="hist-valor" style="color:${h.ganhou?'#166534':'#991b1b'}">${h.ganhou?'+R$'+h.premio.toFixed(2):'-R$'+h.aposta.valor.toFixed(2)}</div>
-            <div class="hist-apostado">R$${h.aposta.valor.toFixed(2)}</div>
-          </div>
-        </div>
-      </div>`;
-  });
-}
-
-// ─── NAVEGAÇÃO ────────────────────────────────────────────
-function mostrarTela(nome) {
-  ["form","sorteando","resultado","bichos","historico"].forEach(t => {
-    toggle("tela-"+t, t===nome);
-  });
-}
-
-function setTab(t) {
-  tab = t;
-  ["apostar","bichos","historico"].forEach(id => {
-    const btn = $("nav-"+id);
-    if (id===t) btn.classList.add("ativo"); else btn.classList.remove("ativo");
-  });
-
-  if (t==="apostar") {
-    mostrarTela("form");
-    resetar();
-  } else if (t==="bichos") {
-    mostrarTela("bichos");
-    renderBichos();
-  } else if (t==="historico") {
-    mostrarTela("historico");
-    renderHistorico();
-  }
-  $("content").scrollTop = 0;
-}
-
-function irApostar() { setTab("apostar"); }
-
-// ─── INIT ─────────────────────────────────────────────────
-(function init() {
-  renderVals();
-  aplicarMod();
-  renderGrade();
-  atualizarSaldo();
-  atualizarBotao();
-})();
-</script>
-</body>
-</html>
+  else $("saldo-txt").classList.remove('
