@@ -708,14 +708,7 @@ setTimeout(()=>{
   else if(isAndroid()&&!deferredPrompt)mostrarBannerAndroid(false);
 },2000);
 
-// Service Worker — só ativa fora do preview do Claude
-if('serviceWorker' in navigator && !location.hostname.includes('claudeusercontent.com')){
-  window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js')
-      .then(()=>console.log('SW registrado'))
-      .catch(e=>console.log('SW erro:',e));
-  });
-}
+// Service Workerif('serviceWorker' in navigator && !location.hostname.includes('claudeusercontent.com')){  window.addEventListener('load',()=>{    const base=location.pathname.startsWith('/BICHO')?'/BICHO/':'/';    navigator.serviceWorker.register(base+'sw.js',{scope:base})      .then(()=>console.log('SW ok')).catch(e=>console.log('SW erro:',e));  });}function gerarIcone(size){  const c=document.createElement('canvas');c.width=c.height=size;  const x=c.getContext('2d');  x.fillStyle='#2563eb';  x.beginPath();x.roundRect(0,0,size,size,size*0.2);x.fill();  x.font='bold '+Math.round(size*0.55)+'px serif';  x.textAlign='center';x.textBaseline='middle';  x.fillText('🎲',size/2,size/2+size*0.03);  return c.toDataURL('image/png');}try{  const lnk=document.querySelector('link[rel="manifest"]');  if(lnk){fetch(lnk.href).then(r=>r.json()).then(mf=>{    const img=new Image();img.onerror=()=>{      mf.icons=[{src:gerarIcone(192),sizes:'192x192',type:'image/png'},{src:gerarIcone(512),sizes:'512x512',type:'image/png'}];      const b=new Blob([JSON.stringify(mf)],{type:'application/json'});      lnk.href=URL.createObjectURL(b);    };img.src=mf.icons[0]?.src||'';  }).catch(()=>{});}}catch(e){}
 
 // Restaurar estado salvo
 try{
