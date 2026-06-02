@@ -637,22 +637,52 @@ function irApostar(){setTab("apostar");}
 // ── PWA ────────────────────────────────────────────────────
 let deferredPrompt=null;
 
+function isIos(){return/iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());}
+function isAndroid(){return/android/.test(navigator.userAgent.toLowerCase());}
+function isStandalone(){return window.matchMedia('(display-mode: standalone)').matches||window.navigator.standalone===true;}
+
+function mostrarBannerAndroid(comBotao){
+  if(isStandalone())return; // já instalado
+  if(localStorage.getItem('install-dismissed'))return;
+  const b=$("install-banner");
+  if(!b)return;
+  if(comBotao){
+    b.querySelector('span').innerHTML='<strong>📲 Instalar como App</strong>Adicione à tela inicial para acesso rápido';
+    $("btn-install-ok").style.display='';
+  } else {
+    b.querySelector('span').innerHTML='<strong>📲 Instalar no Android</strong>Menu do Chrome (⋮) → "Adicionar à tela inicial"';
+    $("btn-install-ok").style.display='none';
+  }
+  b.classList.remove('hidden');
+}
+
+function mostrarBannerIos(){
+  if(isStandalone())return;
+  if(localStorage.getItem('install-dismissed'))return;
+  const b=$("install-banner");
+  if(!b)return;
+  b.querySelector('span').innerHTML='<strong>📲 Instalar no iPhone</strong>Toque em <b>Compartilhar ↑</b> → "Adicionar à Tela de Início"';
+  $("btn-install-ok").style.display='none';
+  b.classList.remove('hidden');
+}
+
+// Captura o evento do Chrome antes de mostrar o prompt nativo
 window.addEventListener('beforeinstallprompt',e=>{
-  e.preventDefault();deferredPrompt=e;
-  // Mostrar banner após 3 segundos
-  setTimeout(()=>{
-    const banner=$("install-banner");
-    if(banner)banner.classList.remove('hidden');
-  },3000);
+  e.preventDefault();
+  deferredPrompt=e;
+  mostrarBannerAndroid(true); // mostra banner com botão Instalar
 });
 
 $("btn-install-ok")?.addEventListener('click',async()=>{
-  if(!deferredPrompt)return;
-  deferredPrompt.prompt();
-  const{outcome}=await deferredPrompt.userChoice;
-  if(outcome==='accepted')toast('✅ App instalado com sucesso!');
-  deferredPrompt=null;
-  hide("install-banner");
+  if(deferredPrompt){
+    deferredPrompt.prompt();
+    const{outcome}=await deferredPrompt.userChoice;
+    if(outcome==='accepted')toast('✅ App instalado com sucesso!');
+    deferredPrompt=null;
+    hide("install-banner");
+  } else {
+    toast('Use o menu do navegador para instalar');
+  }
 });
 
 $("btn-install-fechar")?.addEventListener('click',()=>{
@@ -666,24 +696,20 @@ window.addEventListener('appinstalled',()=>{
   deferredPrompt=null;
 });
 
-// iOS — instrução manual
-function isIos(){return/iphone|ipad|ipod/.test(navigator.userAgent.toLowerCase());}
-function isInStandaloneMode(){return('standalone' in window.navigator)&&window.navigator.standalone;}
-if(isIos()&&!isInStandaloneMode()&&!localStorage.getItem('install-dismissed')){
-  setTimeout(()=>{
-    const b=$("install-banner");
-    if(b){
-      b.querySelector('span').innerHTML='<strong>📲 Instalar no iPhone</strong>Toque em <b>Compartilhar</b> → "Adicionar à Tela de Início"';
-      b.querySelector('#btn-install-ok').style.display='none';
-      b.classList.remove('hidden');
-    }
-  },3000);
-}
+// Mostrar instrução após 2s se não tiver capturado o evento
+setTimeout(()=>{
+  if(isStandalone())return;
+  if(localStorage.getItem('install-dismissed'))return;
+  if(isIos())mostrarBannerIos();
+  else if(isAndroid()&&!deferredPrompt)mostrarBannerAndroid(false);
+},2000);
 
 // Service Worker
 if('serviceWorker' in navigator){
   window.addEventListener('load',()=>{
-    navigator.serviceWorker.register('sw.js').catch(()=>{});
+    navigator.serviceWorker.register('sw.js')
+      .then(()=>console.log('SW registrado'))
+      .catch(e=>console.log('SW erro:',e));
   });
 }
 
@@ -698,7 +724,6 @@ try{
 // Init
 (function init(){
   renderVals();aplicarMod();renderGrade();atualizarSaldo();atualizarBotao();
-  if(localStorage.getItem('install-dismissed'))hide("install-banner");
 })();
 </script>
 </body>
